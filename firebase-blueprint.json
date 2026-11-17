@@ -1,0 +1,411 @@
+{
+  "entities": {
+    "AuthorizedUser": {
+      "title": "AuthorizedUser",
+      "description": "An authorized staff member or admin in Mashaer Customer Care Hub.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "emailKey": { "type": "string", "maxLength": 200, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "employee"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "allowedSections": { "type": "array", "description": "Allowed section keys for employees" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["email", "emailKey", "displayName", "role", "status", "allowedSections", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "UserPreferences": {
+      "title": "UserPreferences",
+      "description": "Independent per-user theme, mode, favorites, and dashboard shortcuts stored in Cloud Firestore.",
+      "type": "object",
+      "properties": {
+        "emailKey": { "type": "string", "maxLength": 200, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "themeId": { "type": "string", "maxLength": 120 },
+        "themeMode": { "type": "string", "enum": ["light", "dark"] },
+        "favoriteProducts": { "type": "array" },
+        "favoriteSituations": { "type": "array" },
+        "favoritePolicies": { "type": "array" },
+        "dashboardShortcuts": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["emailKey", "themeId", "themeMode", "updatedAt", "updatedBy"]
+    },
+    "CannedResponse": {
+      "title": "CannedResponse",
+      "description": "A ready-to-copy Kuwaiti dialect customer care response.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 100 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "internalNotes": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["title", "category", "content", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "CustomerInquiry": {
+      "title": "CustomerInquiry",
+      "description": "Customer FAQ imported from Word/PDF or created by admins.",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string", "maxLength": 2000 },
+        "answer": { "type": "string", "maxLength": 8000 },
+        "category": { "type": "string", "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "needsAdminReview": { "type": "boolean" },
+        "source": { "type": "string", "enum": ["word_import", "manual"] },
+        "sourceOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["question", "answer", "category", "needsAdminReview", "source", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Policy": {
+      "title": "Policy",
+      "description": "Official structured customer care policy and procedure.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 120 },
+        "content": { "type": "string", "maxLength": 10000 },
+        "summary": { "type": "string", "maxLength": 1000 },
+        "applicableCases": { "type": "string", "maxLength": 3000 },
+        "conditions": { "type": "string", "maxLength": 3000 },
+        "exceptions": { "type": "string", "maxLength": 3000 },
+        "requiredAction": { "type": "string", "maxLength": 3000 },
+        "suggestedReply": { "type": "string", "maxLength": 4000 },
+        "escalationDept": { "type": "string", "maxLength": 150 },
+        "source": { "type": "string", "maxLength": 300 },
+        "needsAdminReview": { "type": "boolean" },
+        "conflictNote": { "type": "string", "maxLength": 2000 },
+        "sourceUrl": { "type": "string", "maxLength": 500 },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["title", "category", "content", "needsAdminReview", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Situation": {
+      "title": "Situation",
+      "description": "Customer care situation guide row from PDF/Excel sheet 1.",
+      "type": "object",
+      "properties": {
+        "situationNumber": { "type": "string", "maxLength": 60 },
+        "category": { "type": "string", "maxLength": 150 },
+        "subCategory": { "type": "string", "maxLength": 150 },
+        "customerInquiry": { "type": "string", "maxLength": 3000 },
+        "requiredData": { "type": "string", "maxLength": 2000 },
+        "internalProcedure": { "type": "string", "maxLength": 4000 },
+        "cannedReply": { "type": "string", "maxLength": 4000 },
+        "responsibleDept": { "type": "string", "maxLength": 150 },
+        "internalNotes": { "type": "string", "maxLength": 2000 },
+        "isImportant": { "type": "boolean" },
+        "linkedPolicyId": { "type": "string", "maxLength": 128 },
+        "needsAdminReview": { "type": "boolean" },
+        "duplicateFlag": { "type": "boolean" },
+        "importHash": { "type": "string", "maxLength": 128 },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["situationNumber", "category", "customerInquiry", "internalProcedure", "cannedReply", "responsibleDept", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "ReturnWorkflowStage": {
+      "title": "ReturnWorkflowStage",
+      "description": "Return and refund workflow stage from PDF/Excel sheet 2.",
+      "type": "object",
+      "properties": {
+        "stageOrder": { "type": "number" },
+        "stage": { "type": "string", "maxLength": 200 },
+        "condition": { "type": "string", "maxLength": 2000 },
+        "procedure": { "type": "string", "maxLength": 4000 },
+        "cannedReply": { "type": "string", "maxLength": 4000 },
+        "employeeNote": { "type": "string", "maxLength": 2000 },
+        "needsAdminReview": { "type": "boolean" },
+        "duplicateFlag": { "type": "boolean" },
+        "importHash": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["stageOrder", "stage", "condition", "procedure", "cannedReply", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "QuickPhrase": {
+      "title": "QuickPhrase",
+      "description": "Quick copyable phrase from PDF/Excel sheet 3.",
+      "type": "object",
+      "properties": {
+        "purpose": { "type": "string", "maxLength": 300 },
+        "phrase": { "type": "string", "maxLength": 3000 },
+        "category": { "type": "string", "maxLength": 120 },
+        "duplicateFlag": { "type": "boolean" },
+        "importHash": { "type": "string", "maxLength": 128 },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["purpose", "phrase", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "EmployeeAlert": {
+      "title": "EmployeeAlert",
+      "description": "Employee alert or rule from PDF/Excel sheet 4.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 300 },
+        "ruleText": { "type": "string", "maxLength": 4000 },
+        "clarification": { "type": "string", "maxLength": 3000 },
+        "severity": { "type": "string", "enum": ["important", "warning", "info"] },
+        "duplicateFlag": { "type": "boolean" },
+        "importHash": { "type": "string", "maxLength": 128 },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["title", "ruleText", "severity", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Official Mashaer Perfume Intelligence item synced from mashaer.store with 6-country GCC pricing.",
+      "type": "object",
+      "properties": {
+        "sku": { "type": "string", "maxLength": 80 },
+        "nameAr": { "type": "string", "maxLength": 200 },
+        "nameEn": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "enum": ["perfumes", "mamoul", "spray"] },
+        "officialDescription": { "type": "string", "maxLength": 4000 },
+        "imageUrl": { "type": "string", "maxLength": 1000 },
+        "fragranceFamily": { "type": "string", "maxLength": 200 },
+        "fragranceCharacter": { "type": "string", "maxLength": 200 },
+        "perfumeType": { "type": "string", "maxLength": 200 },
+        "sillage": { "type": "string", "maxLength": 120 },
+        "longevity": { "type": "string", "maxLength": 120 },
+        "occasionUsage": { "type": "string", "maxLength": 300 },
+        "seasons": { "type": "string", "maxLength": 200 },
+        "notesAndIngredients": { "type": "string", "maxLength": 2000 },
+        "topNotes": { "type": "string", "maxLength": 1000 },
+        "heartNotes": { "type": "string", "maxLength": 1000 },
+        "baseNotes": { "type": "string", "maxLength": 1000 },
+        "size": { "type": "string", "maxLength": 120 },
+        "availability": { "type": "string", "maxLength": 120 },
+        "usageInstructions": { "type": "string", "maxLength": 2000 },
+        "extraInfo": { "type": "string", "maxLength": 2000 },
+        "internalNotes": { "type": "string", "maxLength": 2000 },
+        "companionGift": { "type": "object", "description": "Optional included companion gift (e.g. 100ml spray or 12ml musk) derived from the main fragrance" },
+        "countryPrices": { "type": "object" },
+        "priceHistory": { "type": "array" },
+        "manuallyEditedFields": { "type": "array" },
+        "syncConflictNote": { "type": "string", "maxLength": 1000 },
+        "lastSyncedAt": { "type": "string", "maxLength": 100 },
+        "syncStatus": { "type": "string", "maxLength": 120 },
+        "reviewStatus": { "type": "string", "enum": ["verified", "needs_review"] },
+        "sourceUrl": { "type": "string", "maxLength": 500 },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["nameAr", "category", "officialDescription", "reviewStatus", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "SystemLink": {
+      "title": "SystemLink",
+      "description": "Operational system card metadata (non-credential).",
+      "type": "object",
+      "properties": {
+        "systemName": { "type": "string", "maxLength": 200 },
+        "url": { "type": "string", "maxLength": 500 },
+        "mainCategory": { "type": "string", "maxLength": 120 },
+        "subCategory": { "type": "string", "maxLength": 120 },
+        "loginMethod": { "type": "string", "enum": ["password", "otp", "sso", "unknown"] },
+        "systemStatus": { "type": "string", "enum": ["active", "legacy", "needs_review"] },
+        "otpNote": { "type": "string", "maxLength": 500 },
+        "publicUsername": { "type": "string", "maxLength": 300 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "usageInstructions": { "type": "string", "maxLength": 3000 },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "visibility": { "type": "string", "enum": ["all_staff", "admins_only"] },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["systemName", "url", "visibility", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "SystemCredential": {
+      "title": "SystemCredential",
+      "description": "Operational system login credentials: admins_only strictly restricted to admins; all_staff readable by active employees; writes restricted to admins.",
+      "type": "object",
+      "properties": {
+        "linkId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "usernameOrEmail": { "type": "string", "maxLength": 300 },
+        "password": { "type": "string", "maxLength": 300 },
+        "visibility": { "type": "string", "enum": ["all_staff", "admins_only"] },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["linkId", "usernameOrEmail", "password", "visibility", "updatedAt", "updatedBy"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "System theme defaults, sync history, and platform configuration (sensitive admins only).",
+      "type": "object",
+      "properties": {
+        "systemName": { "type": "string", "maxLength": 200 },
+        "logoDataUrl": { "type": "string", "maxLength": 350000 },
+        "coverDataUrl": { "type": "string", "maxLength": 450000 },
+        "heroTitle": { "type": "string", "maxLength": 200 },
+        "heroSubtitle": { "type": "string", "maxLength": 300 },
+        "heroDescription": { "type": "string", "maxLength": 1000 },
+        "textPosition": { "type": "string", "enum": ["right", "center", "left"] },
+        "showHeroText": { "type": "boolean" },
+        "desktopTextSize": { "type": "string", "enum": ["sm", "md", "lg"] },
+        "mobileTextSize": { "type": "string", "enum": ["sm", "md", "lg"] },
+        "themeMode": { "type": "string", "enum": ["light", "dark"] },
+        "accentTone": { "type": "string", "enum": ["gold", "burgundy"] },
+        "activeThemeId": { "type": "string", "maxLength": 120 },
+        "previousThemeId": { "type": "string", "maxLength": 120 },
+        "customThemes": { "type": "array" },
+        "uiConfig": { "type": "object", "description": "Admin-editable design tokens, labels, hero cover, cards, buttons, and home links" },
+        "syncHistory": { "type": "array" },
+        "knowledgeSeedVersion": { "type": "number" },
+        "lastStoreSyncAt": { "type": "string", "maxLength": 100 },
+        "lastStoreSyncStatus": { "type": "string", "maxLength": 300 },
+        "enabledSections": { "type": "array" },
+        "wordImportedAt": { "type": "string", "maxLength": 100 },
+        "wordImportCount": { "type": "number" },
+        "pdfImportedAt": { "type": "string", "maxLength": 100 },
+        "pdfImportCount": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["updatedAt", "updatedBy"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Custom category definition for sections.",
+      "type": "object",
+      "properties": {
+        "section": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 120 },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["section", "name", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit log entry (readable by 3 sensitive admins only).",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "maxLength": 128 },
+        "actorName": { "type": "string", "maxLength": 200 },
+        "actorEmail": { "type": "string", "maxLength": 200 },
+        "actorRole": { "type": "string", "maxLength": 60 },
+        "section": { "type": "string", "maxLength": 120 },
+        "itemName": { "type": "string", "maxLength": 300 },
+        "itemId": { "type": "string", "maxLength": 128 },
+        "actionType": { "type": "string", "enum": ["create", "update", "delete", "import", "restore"] },
+        "result": { "type": "string", "enum": ["success", "blocked", "failed"] },
+        "summary": { "type": "string", "maxLength": 1000 },
+        "previousValue": { "type": "string", "maxLength": 8000 },
+        "newValue": { "type": "string", "maxLength": 8000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "actorName", "actorEmail", "section", "itemName", "actionType", "summary", "createdAt"]
+    },
+    "BackupRecord": {
+      "title": "BackupRecord",
+      "description": "Metadata record for JSON backups created or restored by sensitive admins.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 200 },
+        "action": { "type": "string", "enum": ["export", "restore"] },
+        "createdByEmail": { "type": "string", "maxLength": 200 },
+        "createdByName": { "type": "string", "maxLength": 200 },
+        "totalRecords": { "type": "number" },
+        "payloadSizeBytes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "action", "createdByEmail", "createdByName", "totalRecords", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/authorized_users/{emailKey}": {
+      "schema": { "$ref": "#/entities/AuthorizedUser" },
+      "description": "Authorized employees and core admins (sensitive admins manage)."
+    },
+    "/user_preferences/{emailKey}": {
+      "schema": { "$ref": "#/entities/UserPreferences" },
+      "description": "Per-user isolated theme, mode, favorites, and dashboard shortcuts."
+    },
+    "/canned_responses/{responseId}": {
+      "schema": { "$ref": "#/entities/CannedResponse" },
+      "description": "Kuwaiti dialect canned responses library."
+    },
+    "/customer_inquiries/{inquiryId}": {
+      "schema": { "$ref": "#/entities/CustomerInquiry" },
+      "description": "Customer inquiries imported from Word/PDF or added by admins."
+    },
+    "/policies/{policyId}": {
+      "schema": { "$ref": "#/entities/Policy" },
+      "description": "Customer care policies and procedures."
+    },
+    "/situations/{situationId}": {
+      "schema": { "$ref": "#/entities/Situation" },
+      "description": "Situations guide rows (Sheet 1)."
+    },
+    "/return_workflow/{stageId}": {
+      "schema": { "$ref": "#/entities/ReturnWorkflowStage" },
+      "description": "Return and refund workflow stages (Sheet 2)."
+    },
+    "/quick_phrases/{phraseId}": {
+      "schema": { "$ref": "#/entities/QuickPhrase" },
+      "description": "Quick copyable phrases (Sheet 3)."
+    },
+    "/employee_alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/EmployeeAlert" },
+      "description": "Employee alerts and rules (Sheet 4)."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Mashaer official Perfume Intelligence catalog with GCC pricing."
+    },
+    "/system_links/{linkId}": {
+      "schema": { "$ref": "#/entities/SystemLink" },
+      "description": "Operational systems metadata."
+    },
+    "/system_credentials/{linkId}": {
+      "schema": { "$ref": "#/entities/SystemCredential" },
+      "description": "Operational system login credentials."
+    },
+    "/site_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Theme defaults, sync flags, and system configuration."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Custom categories per section."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable audit logs (readable by sensitive admins only)."
+    },
+    "/backups/{backupId}": {
+      "schema": { "$ref": "#/entities/BackupRecord" },
+      "description": "Sensitive-admin-only backup export and restore history."
+    }
+  }
+}

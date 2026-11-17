@@ -1,0 +1,193 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --hub-primary: #4A0E1C;
+    --hub-heading: #4A0E1C;
+    --hub-secondary: #6B1A2D;
+    --hub-accent: #8A692C;
+    --hub-accent-soft: #C5A059;
+    --hub-bg: #FAF7F2;
+    --hub-surface: #FFFFFF;
+    --hub-surface-alt: #F3EDE2;
+    --hub-text: #1E1618;
+    --hub-muted: #5D4C51;
+    --hub-border: #E6DDD0;
+    --hub-sidebar: #4A0E1C;
+    --hub-sidebar-alt: #320812;
+    --hub-sidebar-text: #FFFFFF;
+    --hub-sidebar-accent: #DEC28A;
+    --hub-button: #4A0E1C;
+    --hub-button-hover: #611527;
+    --hub-button-text: #FFFFFF;
+
+    --hub-font-sans: 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    --hub-font-display: 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    --hub-font-base-px: 15px;
+    --hub-heading-scale: 1;
+    --hub-body-scale: 1;
+
+    --text-xs: calc(0.75rem * var(--hub-body-scale, 1));
+    --text-sm: calc(0.875rem * var(--hub-body-scale, 1));
+    --text-base: calc(1rem * var(--hub-body-scale, 1));
+    --text-lg: calc(1.125rem * var(--hub-heading-scale, 1));
+    --text-xl: calc(1.25rem * var(--hub-heading-scale, 1));
+    --text-2xl: calc(1.5rem * var(--hub-heading-scale, 1));
+    --text-3xl: calc(1.875rem * var(--hub-heading-scale, 1));
+  }
+
+  html.dark {
+    --hub-primary: #DEC28A;
+    --hub-heading: #F5EFE6;
+    --hub-secondary: #4A0E1C;
+    --hub-accent: #DEC28A;
+    --hub-accent-soft: #C5A059;
+    --hub-bg: #13080B;
+    --hub-surface: #1C0C10;
+    --hub-surface-alt: #241016;
+    --hub-text: #F5EFE6;
+    --hub-muted: #C8B8BD;
+    --hub-border: #3D1D26;
+    --hub-sidebar: #23060D;
+    --hub-sidebar-alt: #170408;
+    --hub-sidebar-text: #F5EFE6;
+    --hub-sidebar-accent: #DEC28A;
+    --hub-button: #DEC28A;
+    --hub-button-hover: #EAD4A8;
+    --hub-button-text: #23060D;
+  }
+
+  html {
+    font-family: var(--hub-font-sans);
+    direction: rtl;
+    font-size: var(--hub-font-base-px, 15px);
+    line-height: 1.75;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-family: var(--hub-font-sans);
+    direction: rtl;
+    font-size: calc(0.9375rem * var(--hub-body-scale, 1));
+    line-height: 1.75;
+    background-color: var(--hub-bg);
+    color: var(--hub-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--hub-font-display);
+    line-height: 1.42;
+    text-wrap: balance;
+    --text-sm: calc(0.875rem * var(--hub-heading-scale, 1));
+    --text-base: calc(1rem * var(--hub-heading-scale, 1));
+  }
+
+  p {
+    line-height: 1.75;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  select,
+  textarea {
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--hub-accent-soft);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--hub-accent-soft) 18%, transparent);
+  }
+
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  thead th {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  tbody tr {
+    transition: background-color 150ms ease;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--hub-accent);
+    outline-offset: 2px;
+  }
+
+  .font-display {
+    font-family: var(--hub-font-display);
+    letter-spacing: -0.005em;
+    line-height: 1.38;
+    --text-sm: calc(0.875rem * var(--hub-heading-scale, 1));
+    --text-base: calc(1rem * var(--hub-heading-scale, 1));
+  }
+
+  .font-mono-tabular {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.hub-card-elevated,
+main section.rounded-xl.border,
+main section.rounded-2xl.border {
+  box-shadow: 0 1px 2px rgba(24, 14, 18, 0.04), 0 8px 24px -16px rgba(74, 14, 28, 0.12);
+}
+
+html.dark .hub-card-elevated,
+html.dark main section.rounded-xl.border,
+html.dark main section.rounded-2xl.border {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 10px 28px -18px rgba(0, 0, 0, 0.65);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--hub-surface-alt);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--hub-accent-soft);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hub-accent);
+}

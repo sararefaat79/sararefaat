@@ -1,0 +1,6 @@
+{
+  "name": "مشاعر | Mashaer Customer Care Hub",
+  "description": "النظام المركزي الموحد لخدمة عملاء مشاعر — مكتبة الردود الجاهزة، استفسارات العملاء، السياسات، دليل المواقف، مسار المرتجع، دليل المنتجات، وإدارة العمليات.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

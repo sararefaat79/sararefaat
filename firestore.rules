@@ -1,0 +1,594 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Core Identity & 3-Tier RBAC Primitives
+    // -------------------------------------------------------------------------
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+
+    function authEmailLower() {
+      return request.auth.token.email.lower();
+    }
+
+    function authEmailKey() {
+      return authEmailLower().replace('[^a-z0-9_\\-]', '_');
+    }
+
+    // Tier 1: 3 Sensitive System Admins (Full Operational + Security/Audit/Backup/Users/Settings)
+    function isSensitiveAdminEmail(emailLower) {
+      return emailLower in [
+        'sararefaat79@gmail.com',
+        's.refaat@mashaer.store',
+        'mayadamashaer@gmail.com'
+      ];
+    }
+
+    // Tier 1 + Tier 2: All 7 Core Admins (Full Operational Access)
+    function isCoreAdminEmail(emailLower) {
+      return emailLower in [
+        'rawi@mashaer.store',
+        'a.ayman@mashaer.store',
+        'abdoun@mashaer.store',
+        'a.ashry@mashaer.store',
+        's.refaat@mashaer.store',
+        'sararefaat79@gmail.com',
+        'mayadamashaer@gmail.com'
+      ];
+    }
+
+    function isCoreAdminEmailKey(key) {
+      return key in [
+        'rawi_mashaer_store',
+        'a_ayman_mashaer_store',
+        'abdoun_mashaer_store',
+        'a_ashry_mashaer_store',
+        's_refaat_mashaer_store',
+        'sararefaat79_gmail_com',
+        'mayadamashaer_gmail_com'
+      ];
+    }
+
+    function isSensitiveAdmin() {
+      return isVerifiedUser() && isSensitiveAdminEmail(authEmailLower());
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && isCoreAdminEmail(authEmailLower());
+    }
+
+    // Tier 3: Active Employees (Read & Copy Only)
+    function isActiveEmployee() {
+      return isVerifiedUser()
+        && !isCoreAdminEmail(authEmailLower())
+        && exists(/databases/$(database)/documents/authorized_users/$(authEmailKey()))
+        && get(/databases/$(database)/documents/authorized_users/$(authEmailKey())).data.status == 'active'
+        && get(/databases/$(database)/documents/authorized_users/$(authEmailKey())).data.role == 'employee';
+    }
+
+    function isAuthorizedStaff() {
+      return isAdmin() || isActiveEmployee();
+    }
+
+    function validStr(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function validOptStr(data, key, maxLen) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function validOptBool(data, key) {
+      return !(key in data) || data[key] == null || (data[key] is bool);
+    }
+
+    function validOptNum(data, key) {
+      return !(key in data) || data[key] == null || (data[key] is int || data[key] is float);
+    }
+
+    function isCreateTimestampValid(data) {
+      return data.createdAt == request.time && data.updatedAt == request.time;
+    }
+
+    function isUpdateTimestampValid(data) {
+      return data.updatedAt == request.time
+        && (
+          ('createdAt' in existing() && 'createdAt' in data && data.createdAt == existing().createdAt)
+          || (!('createdAt' in existing()) && !('createdAt' in data))
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validators
+    // -------------------------------------------------------------------------
+    function isValidAuthorizedUser(data) {
+      return data.keys().hasAll(['email', 'emailKey', 'displayName', 'role', 'status', 'allowedSections', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['email', 'emailKey', 'displayName', 'role', 'status', 'allowedSections', 'notes', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.email, 3, 200)
+        && isValidId(data.emailKey)
+        && validStr(data.displayName, 1, 120)
+        && data.role in ['admin', 'employee']
+        && data.status in ['active', 'suspended']
+        && data.allowedSections is list
+        && data.allowedSections.size() <= 12
+        && data.allowedSections.hasOnly(['home', 'responses', 'inquiries', 'policies', 'situations', 'returns', 'products', 'systems'])
+        && validOptStr(data, 'notes', 500)
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidUserPreferences(data) {
+      return data.keys().hasAll(['emailKey', 'themeId', 'themeMode', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['emailKey', 'themeId', 'themeMode', 'favoriteProducts', 'favoriteSituations', 'favoritePolicies', 'dashboardShortcuts', 'updatedAt', 'updatedBy'])
+        && isValidId(data.emailKey)
+        && data.emailKey == authEmailKey()
+        && validStr(data.themeId, 1, 120)
+        && data.themeMode in ['light', 'dark']
+        && (!( 'favoriteProducts' in data ) || data.favoriteProducts == null || (data.favoriteProducts is list && data.favoriteProducts.size() <= 100))
+        && (!( 'favoriteSituations' in data ) || data.favoriteSituations == null || (data.favoriteSituations is list && data.favoriteSituations.size() <= 100))
+        && (!( 'favoritePolicies' in data ) || data.favoritePolicies == null || (data.favoritePolicies is list && data.favoritePolicies.size() <= 100))
+        && (!( 'dashboardShortcuts' in data ) || data.dashboardShortcuts == null || (data.dashboardShortcuts is list && data.dashboardShortcuts.size() <= 12))
+        && validStr(data.updatedBy, 3, 200)
+        && data.updatedAt == request.time;
+    }
+
+    function isValidCannedResponse(data) {
+      return data.keys().hasAll(['title', 'category', 'content', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['title', 'category', 'content', 'internalNotes', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.title, 1, 200)
+        && validStr(data.category, 1, 100)
+        && validStr(data.content, 1, 5000)
+        && validOptStr(data, 'internalNotes', 2000)
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidCustomerInquiry(data) {
+      return data.keys().hasAll(['question', 'answer', 'category', 'needsAdminReview', 'source', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['question', 'answer', 'category', 'notes', 'needsAdminReview', 'source', 'sourceOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.question, 1, 2000)
+        && validStr(data.answer, 1, 8000)
+        && validStr(data.category, 1, 120)
+        && validOptStr(data, 'notes', 2000)
+        && data.needsAdminReview is bool
+        && data.source in ['word_import', 'manual']
+        && validOptNum(data, 'sourceOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidPolicy(data) {
+      return data.keys().hasAll(['title', 'category', 'content', 'needsAdminReview', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['title', 'category', 'content', 'summary', 'applicableCases', 'conditions', 'exceptions', 'requiredAction', 'suggestedReply', 'escalationDept', 'source', 'needsAdminReview', 'conflictNote', 'sourceUrl', 'sortOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.title, 1, 200)
+        && validStr(data.category, 1, 120)
+        && validStr(data.content, 1, 10000)
+        && validOptStr(data, 'summary', 1000)
+        && validOptStr(data, 'applicableCases', 3000)
+        && validOptStr(data, 'conditions', 3000)
+        && validOptStr(data, 'exceptions', 3000)
+        && validOptStr(data, 'requiredAction', 3000)
+        && validOptStr(data, 'suggestedReply', 4000)
+        && validOptStr(data, 'escalationDept', 150)
+        && validOptStr(data, 'source', 300)
+        && data.needsAdminReview is bool
+        && validOptStr(data, 'conflictNote', 2000)
+        && validOptStr(data, 'sourceUrl', 500)
+        && validOptNum(data, 'sortOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidSituation(data) {
+      return data.keys().hasAll(['situationNumber', 'category', 'customerInquiry', 'internalProcedure', 'cannedReply', 'responsibleDept', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['situationNumber', 'category', 'subCategory', 'customerInquiry', 'requiredData', 'internalProcedure', 'cannedReply', 'responsibleDept', 'internalNotes', 'isImportant', 'linkedPolicyId', 'needsAdminReview', 'duplicateFlag', 'importHash', 'sortOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.situationNumber, 1, 60)
+        && validStr(data.category, 1, 150)
+        && validOptStr(data, 'subCategory', 150)
+        && validStr(data.customerInquiry, 1, 3000)
+        && validOptStr(data, 'requiredData', 2000)
+        && validStr(data.internalProcedure, 1, 4000)
+        && validStr(data.cannedReply, 1, 4000)
+        && validStr(data.responsibleDept, 1, 150)
+        && validOptStr(data, 'internalNotes', 2000)
+        && validOptBool(data, 'isImportant')
+        && validOptStr(data, 'linkedPolicyId', 128)
+        && validOptBool(data, 'needsAdminReview')
+        && validOptBool(data, 'duplicateFlag')
+        && validOptStr(data, 'importHash', 128)
+        && validOptNum(data, 'sortOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidReturnStage(data) {
+      return data.keys().hasAll(['stageOrder', 'stage', 'condition', 'procedure', 'cannedReply', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['stageOrder', 'stage', 'condition', 'procedure', 'cannedReply', 'employeeNote', 'needsAdminReview', 'duplicateFlag', 'importHash', 'createdAt', 'updatedAt', 'updatedBy'])
+        && (data.stageOrder is int || data.stageOrder is float)
+        && validStr(data.stage, 1, 200)
+        && validStr(data.condition, 1, 2000)
+        && validStr(data.procedure, 1, 4000)
+        && validStr(data.cannedReply, 1, 4000)
+        && validOptStr(data, 'employeeNote', 2000)
+        && validOptBool(data, 'needsAdminReview')
+        && validOptBool(data, 'duplicateFlag')
+        && validOptStr(data, 'importHash', 128)
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidQuickPhrase(data) {
+      return data.keys().hasAll(['purpose', 'phrase', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['purpose', 'phrase', 'category', 'duplicateFlag', 'importHash', 'sortOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.purpose, 1, 300)
+        && validStr(data.phrase, 1, 3000)
+        && validOptStr(data, 'category', 120)
+        && validOptBool(data, 'duplicateFlag')
+        && validOptStr(data, 'importHash', 128)
+        && validOptNum(data, 'sortOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidEmployeeAlert(data) {
+      return data.keys().hasAll(['title', 'ruleText', 'severity', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['title', 'ruleText', 'clarification', 'severity', 'duplicateFlag', 'importHash', 'sortOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.title, 1, 300)
+        && validStr(data.ruleText, 1, 4000)
+        && validOptStr(data, 'clarification', 3000)
+        && data.severity in ['important', 'warning', 'info']
+        && validOptBool(data, 'duplicateFlag')
+        && validOptStr(data, 'importHash', 128)
+        && validOptNum(data, 'sortOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['nameAr', 'category', 'officialDescription', 'reviewStatus', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['sku', 'nameAr', 'nameEn', 'category', 'officialDescription', 'imageUrl', 'fragranceFamily', 'fragranceCharacter', 'perfumeType', 'sillage', 'longevity', 'occasionUsage', 'seasons', 'notesAndIngredients', 'topNotes', 'heartNotes', 'baseNotes', 'size', 'availability', 'usageInstructions', 'extraInfo', 'internalNotes', 'companionGift', 'countryPrices', 'priceHistory', 'manuallyEditedFields', 'syncConflictNote', 'lastSyncedAt', 'syncStatus', 'reviewStatus', 'sourceUrl', 'sortOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validOptStr(data, 'sku', 80)
+        && validStr(data.nameAr, 1, 200)
+        && validOptStr(data, 'nameEn', 200)
+        && data.category in ['perfumes', 'mamoul', 'spray']
+        && validStr(data.officialDescription, 1, 4000)
+        && validOptStr(data, 'imageUrl', 1000)
+        && validOptStr(data, 'fragranceFamily', 200)
+        && validOptStr(data, 'fragranceCharacter', 200)
+        && validOptStr(data, 'perfumeType', 200)
+        && validOptStr(data, 'sillage', 120)
+        && validOptStr(data, 'longevity', 120)
+        && validOptStr(data, 'occasionUsage', 300)
+        && validOptStr(data, 'seasons', 200)
+        && validOptStr(data, 'notesAndIngredients', 2000)
+        && validOptStr(data, 'topNotes', 1000)
+        && validOptStr(data, 'heartNotes', 1000)
+        && validOptStr(data, 'baseNotes', 1000)
+        && validOptStr(data, 'size', 120)
+        && validOptStr(data, 'availability', 120)
+        && validOptStr(data, 'usageInstructions', 2000)
+        && validOptStr(data, 'extraInfo', 2000)
+        && validOptStr(data, 'internalNotes', 2000)
+        && (!( 'companionGift' in data ) || data.companionGift == null || (data.companionGift is map && data.companionGift.keys().hasOnly(['title', 'size', 'kind', 'compositionNote']) && validOptStr(data.companionGift, 'title', 160) && validOptStr(data.companionGift, 'size', 80) && validOptStr(data.companionGift, 'kind', 40) && validOptStr(data.companionGift, 'compositionNote', 800)))
+        && (!( 'countryPrices' in data ) || data.countryPrices == null || data.countryPrices is map)
+        && (!( 'priceHistory' in data ) || data.priceHistory == null || (data.priceHistory is list && data.priceHistory.size() <= 40))
+        && (!( 'manuallyEditedFields' in data ) || data.manuallyEditedFields == null || (data.manuallyEditedFields is list && data.manuallyEditedFields.size() <= 35))
+        && validOptStr(data, 'syncConflictNote', 1000)
+        && validOptStr(data, 'lastSyncedAt', 100)
+        && validOptStr(data, 'syncStatus', 120)
+        && data.reviewStatus in ['verified', 'needs_review']
+        && validOptStr(data, 'sourceUrl', 500)
+        && validOptNum(data, 'sortOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidSystemLink(data) {
+      return data.keys().hasAll(['systemName', 'url', 'visibility', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['systemName', 'url', 'mainCategory', 'subCategory', 'loginMethod', 'systemStatus', 'otpNote', 'publicUsername', 'description', 'usageInstructions', 'notes', 'visibility', 'sortOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.systemName, 1, 200)
+        && validStr(data.url, 1, 500)
+        && validOptStr(data, 'mainCategory', 120)
+        && validOptStr(data, 'subCategory', 120)
+        && (!( 'loginMethod' in data ) || data.loginMethod in ['password', 'otp', 'sso', 'unknown'])
+        && (!( 'systemStatus' in data ) || data.systemStatus in ['active', 'legacy', 'needs_review'])
+        && validOptStr(data, 'otpNote', 500)
+        && validOptStr(data, 'publicUsername', 300)
+        && validOptStr(data, 'description', 2000)
+        && validOptStr(data, 'usageInstructions', 3000)
+        && validOptStr(data, 'notes', 2000)
+        && data.visibility in ['all_staff', 'admins_only']
+        && validOptNum(data, 'sortOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidSystemCredential(data) {
+      return data.keys().hasAll(['linkId', 'usernameOrEmail', 'password', 'visibility', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['linkId', 'usernameOrEmail', 'password', 'visibility', 'updatedAt', 'updatedBy'])
+        && isValidId(data.linkId)
+        && validStr(data.usernameOrEmail, 0, 300)
+        && validStr(data.password, 0, 300)
+        && data.visibility in ['all_staff', 'admins_only']
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidSiteSettings(data) {
+      return data.keys().hasAll(['updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['systemName', 'logoDataUrl', 'coverDataUrl', 'heroTitle', 'heroSubtitle', 'heroDescription', 'textPosition', 'showHeroText', 'desktopTextSize', 'mobileTextSize', 'themeMode', 'accentTone', 'activeThemeId', 'previousThemeId', 'customThemes', 'uiConfig', 'syncHistory', 'knowledgeSeedVersion', 'lastStoreSyncAt', 'lastStoreSyncStatus', 'enabledSections', 'wordImportedAt', 'wordImportCount', 'pdfImportedAt', 'pdfImportCount', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validOptStr(data, 'systemName', 200)
+        && validOptStr(data, 'logoDataUrl', 350000)
+        && validOptStr(data, 'coverDataUrl', 450000)
+        && validOptStr(data, 'heroTitle', 200)
+        && validOptStr(data, 'heroSubtitle', 300)
+        && validOptStr(data, 'heroDescription', 1000)
+        && (!( 'textPosition' in data ) || data.textPosition in ['right', 'center', 'left'])
+        && validOptBool(data, 'showHeroText')
+        && (!( 'desktopTextSize' in data ) || data.desktopTextSize in ['sm', 'md', 'lg'])
+        && (!( 'mobileTextSize' in data ) || data.mobileTextSize in ['sm', 'md', 'lg'])
+        && (!( 'themeMode' in data ) || data.themeMode in ['light', 'dark'])
+        && (!( 'accentTone' in data ) || data.accentTone in ['gold', 'burgundy'])
+        && validOptStr(data, 'activeThemeId', 120)
+        && validOptStr(data, 'previousThemeId', 120)
+        && (!( 'customThemes' in data ) || data.customThemes == null || (data.customThemes is list && data.customThemes.size() <= 15))
+        && (!( 'uiConfig' in data ) || data.uiConfig == null || (data.uiConfig is map && data.uiConfig.keys().size() <= 80))
+        && (!( 'syncHistory' in data ) || data.syncHistory == null || (data.syncHistory is list && data.syncHistory.size() <= 30))
+        && validOptNum(data, 'knowledgeSeedVersion')
+        && validOptStr(data, 'lastStoreSyncAt', 100)
+        && validOptStr(data, 'lastStoreSyncStatus', 300)
+        && (!( 'enabledSections' in data ) || data.enabledSections == null || (data.enabledSections is list && data.enabledSections.size() <= 20))
+        && validOptStr(data, 'wordImportedAt', 100)
+        && validOptNum(data, 'wordImportCount')
+        && validOptStr(data, 'pdfImportedAt', 100)
+        && validOptNum(data, 'pdfImportCount')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['section', 'name', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['section', 'name', 'sortOrder', 'createdAt', 'updatedAt', 'updatedBy'])
+        && validStr(data.section, 1, 100)
+        && validStr(data.name, 1, 120)
+        && validOptNum(data, 'sortOrder')
+        && validStr(data.updatedBy, 3, 200);
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorName', 'actorEmail', 'section', 'itemName', 'actionType', 'summary', 'createdAt'])
+        && data.keys().hasOnly(['actorUid', 'actorName', 'actorEmail', 'actorRole', 'section', 'itemName', 'itemId', 'actionType', 'result', 'summary', 'previousValue', 'newValue', 'createdAt'])
+        && data.actorUid == request.auth.uid
+        && validStr(data.actorName, 1, 200)
+        && validStr(data.actorEmail, 3, 200)
+        && data.actorEmail.lower() == authEmailLower()
+        && validOptStr(data, 'actorRole', 60)
+        && validStr(data.section, 1, 120)
+        && validStr(data.itemName, 1, 300)
+        && validOptStr(data, 'itemId', 128)
+        && data.actionType in ['create', 'update', 'delete', 'import', 'restore']
+        && (!( 'result' in data ) || data.result in ['success', 'blocked', 'failed'])
+        && validStr(data.summary, 1, 1000)
+        && validOptStr(data, 'previousValue', 8000)
+        && validOptStr(data, 'newValue', 8000)
+        && data.createdAt == request.time;
+    }
+
+    function isValidBackupRecord(data) {
+      return data.keys().hasAll(['name', 'action', 'createdByEmail', 'createdByName', 'totalRecords', 'createdAt'])
+        && data.keys().hasOnly(['name', 'action', 'createdByEmail', 'createdByName', 'totalRecords', 'payloadSizeBytes', 'createdAt'])
+        && validStr(data.name, 1, 200)
+        && data.action in ['export', 'restore']
+        && validStr(data.createdByEmail, 3, 200)
+        && validStr(data.createdByName, 1, 200)
+        && (data.totalRecords is int || data.totalRecords is float)
+        && validOptNum(data, 'payloadSizeBytes')
+        && data.createdAt == request.time;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    // 1. Authorized Users (Sensitive Admins manage; each verified user may read only their own doc)
+    match /authorized_users/{emailKey} {
+      allow get: if isValidId(emailKey) && (isSensitiveAdmin() || (isVerifiedUser() && emailKey == authEmailKey()));
+      allow list: if isSensitiveAdmin();
+      allow create: if isValidId(emailKey)
+        && isSensitiveAdmin()
+        && isValidAuthorizedUser(incoming())
+        && incoming().emailKey == emailKey
+        && isCreateTimestampValid(incoming())
+        && (!isCoreAdminEmailKey(emailKey) || (incoming().role == 'admin' && incoming().status == 'active'));
+      allow update: if isValidId(emailKey)
+        && isSensitiveAdmin()
+        && isValidAuthorizedUser(incoming())
+        && incoming().emailKey == existing().emailKey
+        && incoming().email == existing().email
+        && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'status', 'allowedSections', 'notes', 'updatedAt', 'updatedBy'])
+        && (!isCoreAdminEmailKey(emailKey) || (incoming().role == 'admin' && incoming().status == 'active'));
+      allow delete: if isValidId(emailKey)
+        && isSensitiveAdmin()
+        && !isCoreAdminEmailKey(emailKey);
+    }
+
+    // 1b. Independent Per-User Preferences (Theme, Dark/Light mode, Favorites, Shortcuts)
+    match /user_preferences/{emailKey} {
+      allow get: if isValidId(emailKey) && isAuthorizedStaff() && emailKey == authEmailKey();
+      allow list: if isSensitiveAdmin();
+      allow create: if isValidId(emailKey)
+        && isAuthorizedStaff()
+        && emailKey == authEmailKey()
+        && isValidUserPreferences(incoming());
+      allow update: if isValidId(emailKey)
+        && isAuthorizedStaff()
+        && emailKey == authEmailKey()
+        && isValidUserPreferences(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['themeId', 'themeMode', 'favoriteProducts', 'favoriteSituations', 'favoritePolicies', 'dashboardShortcuts', 'updatedAt', 'updatedBy']);
+      allow delete: if false;
+    }
+
+    // 2. Canned Responses
+    match /canned_responses/{responseId} {
+      allow get: if isValidId(responseId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(responseId) && isAdmin() && isValidCannedResponse(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(responseId) && isAdmin() && isValidCannedResponse(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'content', 'internalNotes', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(responseId) && isAdmin();
+    }
+
+    // 3. Customer Inquiries
+    match /customer_inquiries/{inquiryId} {
+      allow get: if isValidId(inquiryId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(inquiryId) && isAdmin() && isValidCustomerInquiry(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(inquiryId) && isAdmin() && isValidCustomerInquiry(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['question', 'answer', 'category', 'notes', 'needsAdminReview', 'source', 'sourceOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(inquiryId) && isAdmin();
+    }
+
+    // 4. Policies
+    match /policies/{policyId} {
+      allow get: if isValidId(policyId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(policyId) && isAdmin() && isValidPolicy(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(policyId) && isAdmin() && isValidPolicy(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).addedKeys().hasOnly(['title', 'category', 'content', 'summary', 'applicableCases', 'conditions', 'exceptions', 'requiredAction', 'suggestedReply', 'escalationDept', 'source', 'needsAdminReview', 'conflictNote', 'sourceUrl', 'sortOrder', 'updatedAt', 'updatedBy'])
+        && incoming().diff(existing()).changedKeys().hasOnly(['title', 'category', 'content', 'summary', 'applicableCases', 'conditions', 'exceptions', 'requiredAction', 'suggestedReply', 'escalationDept', 'source', 'needsAdminReview', 'conflictNote', 'sourceUrl', 'sortOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(policyId) && isAdmin();
+    }
+
+    // 5. Situations (Sheet 1)
+    match /situations/{situationId} {
+      allow get: if isValidId(situationId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(situationId) && isAdmin() && isValidSituation(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(situationId) && isAdmin() && isValidSituation(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['situationNumber', 'category', 'subCategory', 'customerInquiry', 'requiredData', 'internalProcedure', 'cannedReply', 'responsibleDept', 'internalNotes', 'isImportant', 'linkedPolicyId', 'needsAdminReview', 'duplicateFlag', 'importHash', 'sortOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(situationId) && isAdmin();
+    }
+
+    // 6. Return Workflow Stages (Sheet 2)
+    match /return_workflow/{stageId} {
+      allow get: if isValidId(stageId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(stageId) && isAdmin() && isValidReturnStage(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(stageId) && isAdmin() && isValidReturnStage(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['stageOrder', 'stage', 'condition', 'procedure', 'cannedReply', 'employeeNote', 'needsAdminReview', 'duplicateFlag', 'importHash', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(stageId) && isAdmin();
+    }
+
+    // 7. Quick Phrases (Sheet 3)
+    match /quick_phrases/{phraseId} {
+      allow get: if isValidId(phraseId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(phraseId) && isAdmin() && isValidQuickPhrase(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(phraseId) && isAdmin() && isValidQuickPhrase(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['purpose', 'phrase', 'category', 'duplicateFlag', 'importHash', 'sortOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(phraseId) && isAdmin();
+    }
+
+    // 8. Employee Alerts (Sheet 4)
+    match /employee_alerts/{alertId} {
+      allow get: if isValidId(alertId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(alertId) && isAdmin() && isValidEmployeeAlert(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(alertId) && isAdmin() && isValidEmployeeAlert(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'ruleText', 'clarification', 'severity', 'duplicateFlag', 'importHash', 'sortOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(alertId) && isAdmin();
+    }
+
+    // 9. Products Guide & Perfume Intelligence
+    match /products/{productId} {
+      allow get: if isValidId(productId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(productId) && isAdmin() && isValidProduct(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(productId) && isAdmin() && isValidProduct(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).addedKeys().hasOnly(['sku', 'nameAr', 'nameEn', 'category', 'officialDescription', 'imageUrl', 'fragranceFamily', 'fragranceCharacter', 'perfumeType', 'sillage', 'longevity', 'occasionUsage', 'seasons', 'notesAndIngredients', 'topNotes', 'heartNotes', 'baseNotes', 'size', 'availability', 'usageInstructions', 'extraInfo', 'internalNotes', 'companionGift', 'countryPrices', 'priceHistory', 'manuallyEditedFields', 'syncConflictNote', 'lastSyncedAt', 'syncStatus', 'reviewStatus', 'sourceUrl', 'sortOrder', 'updatedAt', 'updatedBy'])
+        && incoming().diff(existing()).changedKeys().hasOnly(['sku', 'nameAr', 'nameEn', 'category', 'officialDescription', 'imageUrl', 'fragranceFamily', 'fragranceCharacter', 'perfumeType', 'sillage', 'longevity', 'occasionUsage', 'seasons', 'notesAndIngredients', 'topNotes', 'heartNotes', 'baseNotes', 'size', 'availability', 'usageInstructions', 'extraInfo', 'internalNotes', 'companionGift', 'countryPrices', 'priceHistory', 'manuallyEditedFields', 'syncConflictNote', 'lastSyncedAt', 'syncStatus', 'reviewStatus', 'sourceUrl', 'sortOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(productId) && isAdmin();
+    }
+
+    // 10. System Links (Operational metadata)
+    match /system_links/{linkId} {
+      allow get: if isValidId(linkId) && (isAdmin() || (isActiveEmployee() && existing().visibility == 'all_staff'));
+      allow list: if isAdmin() || (isActiveEmployee() && resource.data.visibility == 'all_staff');
+      allow create: if isValidId(linkId) && isAdmin() && isValidSystemLink(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(linkId) && isAdmin() && isValidSystemLink(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['systemName', 'url', 'mainCategory', 'subCategory', 'loginMethod', 'systemStatus', 'otpNote', 'publicUsername', 'description', 'usageInstructions', 'notes', 'visibility', 'sortOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(linkId) && isAdmin();
+    }
+
+    // 11. System Credentials
+    match /system_credentials/{linkId} {
+      allow get: if isValidId(linkId) && (isAdmin() || (isActiveEmployee() && existing().visibility == 'all_staff'));
+      allow list: if isAdmin() || (isActiveEmployee() && resource.data.visibility == 'all_staff');
+      allow create: if isValidId(linkId)
+        && isAdmin()
+        && isValidSystemCredential(incoming())
+        && incoming().linkId == linkId
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/system_links/$(linkId));
+      allow update: if isValidId(linkId)
+        && isAdmin()
+        && isValidSystemCredential(incoming())
+        && incoming().linkId == existing().linkId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['usernameOrEmail', 'password', 'visibility', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(linkId) && isAdmin();
+    }
+
+    // 12. Site Settings (Sensitive Admins manage configuration; all staff can read defaults)
+    match /site_settings/{settingId} {
+      allow get: if isValidId(settingId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(settingId) && isSensitiveAdmin() && isValidSiteSettings(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isValidId(settingId) && isSensitiveAdmin() && isValidSiteSettings(incoming()) && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['systemName', 'logoDataUrl', 'coverDataUrl', 'heroTitle', 'heroSubtitle', 'heroDescription', 'textPosition', 'showHeroText', 'desktopTextSize', 'mobileTextSize', 'themeMode', 'accentTone', 'activeThemeId', 'previousThemeId', 'customThemes', 'uiConfig', 'syncHistory', 'knowledgeSeedVersion', 'lastStoreSyncAt', 'lastStoreSyncStatus', 'enabledSections', 'wordImportedAt', 'wordImportCount', 'pdfImportedAt', 'pdfImportCount', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(settingId) && isSensitiveAdmin();
+    }
+
+    // 13. Categories
+    match /categories/{categoryId} {
+      allow get: if isValidId(categoryId) && isAuthorizedStaff();
+      allow list: if isAuthorizedStaff();
+      allow create: if isValidId(categoryId) && isAdmin() && isValidCategory(incoming()) && isCreateTimestampValid(incoming());
+      allow update: if isValidId(categoryId) && isAdmin() && isValidCategory(incoming()) && isUpdateTimestampValid(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['section', 'name', 'sortOrder', 'updatedAt', 'updatedBy']);
+      allow delete: if isValidId(categoryId) && isAdmin();
+    }
+
+    // 14. Audit Logs (Any admin action creates immutable log; ONLY 3 Sensitive Admins can read/list)
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && isSensitiveAdmin();
+      allow list: if isSensitiveAdmin();
+      allow create: if isValidId(logId) && isAdmin() && isValidAuditLog(incoming());
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // 15. Backup Metadata (ONLY 3 Sensitive Admins can read/create/delete)
+    match /backups/{backupId} {
+      allow get: if isValidId(backupId) && isSensitiveAdmin();
+      allow list: if isSensitiveAdmin();
+      allow create: if isValidId(backupId) && isSensitiveAdmin() && isValidBackupRecord(incoming());
+      allow update: if false;
+      allow delete: if isValidId(backupId) && isSensitiveAdmin();
+    }
+  }
+}
